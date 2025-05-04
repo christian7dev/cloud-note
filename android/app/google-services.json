@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "127759930655",
+    "project_id": "cloudnote-78742",
+    "storage_bucket": "cloudnote-78742.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:127759930655:android:5586132d4ffb35bd1c0c2a",
+        "android_client_info": {
+          "package_name": "com.example.cloud_note"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB30fesMqByRx4e6nt6gqD335Gej6-85oo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
