@@ -128,7 +128,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
 
-  void _shareNote() async {
+  Future<void> _shareNote() async {
     final emailController = TextEditingController();
     String selectedRole = 'view';
 
@@ -143,9 +143,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               children: [
                 TextField(
                   controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Receiver Email',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Receiver Email'),
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
@@ -155,23 +153,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     DropdownMenuItem(value: 'view', child: Text('Read Only')),
                     DropdownMenuItem(value: 'edit', child: Text('Edit')),
                   ],
-                  onChanged: (value) {
-                    selectedRole = value ?? 'view';
-                  },
+                  onChanged: (value) => selectedRole = value ?? 'view',
                 ),
               ],
             ),
             actions: [
-              TextButton(
-                child: const Text('Cancel'),
-                onPressed: () => Navigator.pop(context),
-              ),
+              TextButton(child: const Text('Cancel'), onPressed: () => Navigator.pop(context)),
               TextButton(
                 child: const Text('Share'),
                 onPressed: () async {
                   final receiverEmail = emailController.text.trim();
                   final currentUserEmail = FirebaseAuth.instance.currentUser?.email;
-
                   if (receiverEmail == currentUserEmail) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("You can't share a note with yourself.")),
@@ -179,47 +171,49 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     return;
                   }
 
+                  Navigator.pop(context); // close dialog first
+
                   try {
                     final query = await FirebaseFirestore.instance
                         .collection('users')
                         .where('email', isEqualTo: receiverEmail)
                         .limit(1)
                         .get();
+                    if (query.docs.isEmpty) throw Exception("Email not found");
+                    final newReceiverId = query.docs.first.id;
 
-                    if (query.docs.isEmpty) {
-                      Navigator.pop(context); // close dialog first
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Error: Email not found.")),
-                      );
-                      return;
-                    }
+                    // Fetch the source note data from the correct path:
+                    final sourceCollection = widget.isSharedNote ? 'shared' : 'notes';
+                    final sourceDoc = await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(widget.isSharedNote ? widget.sharedUserId : FirebaseAuth.instance.currentUser!.uid)
+                        .collection(sourceCollection)
+                        .doc(widget.note!.id)
+                        .get();
+                    final noteData = Map<String, dynamic>.from(sourceDoc.data()!);
 
-                    final sharedUserId = query.docs.first.id;
+                    // Prepare the data for the new share:
+                    noteData['role'] = selectedRole;
+                    // always point sharedFrom at the ORIGINAL owner:
+                    noteData['sharedFrom'] = widget.isSharedNote
+                        ? widget.note!.sharedFrom  // keep the original owner
+                        : FirebaseAuth.instance.currentUser!.uid;
+                    noteData['timestamp'] = FieldValue.serverTimestamp();
 
+                    // Write into the new recipient’s shared collection:
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(newReceiverId)
+                        .collection('shared')
+                        .doc(widget.note!.id)
+                        .set(noteData);
 
-                    await _noteService.shareNote(
-                      receiverEmail: receiverEmail,
-                      note: widget.note!,
-                      role: selectedRole,
-                    );
-
-                    await _noteService.updateNote(
-                      userId: FirebaseAuth.instance.currentUser!.uid,
-                      noteId: widget.note!.id,
-                      title: widget.note!.title,
-                      content: widget.note!.content,
-                      tags: widget.note!.tags,
-                      sharedUserId: sharedUserId, // Save sharedUserId
-                    );
-
-                    Navigator.pop(context); // close dialog
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("Note shared successfully!")),
                     );
                   } catch (e) {
-                    Navigator.pop(context); // close dialog
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Error: ${e.toString()}")),
+                      SnackBar(content: Text("Error sharing note: ${e.toString()}")),
                     );
                   }
                 },
@@ -230,6 +224,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       },
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +242,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           style: const TextStyle(color: Colors.deepPurple),
         ),
         actions: [
-          if (widget.note != null && !widget.isSharedNote)
+          if (widget.note != null  && widget.isEditable)
             IconButton(
               icon: const Icon(Icons.share, color: Colors.deepPurple),
               onPressed: _shareNote,

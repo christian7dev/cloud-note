@@ -58,26 +58,22 @@ class NoteService {
       updateData['tags'] = tags;
     }
 
-    if (sharedUserId != null) {
-      updateData['sharedUserId'] = sharedUserId; // Add sharedUserId to update data
-    }
-
-    // Update in the user's notes collection (for the note owner)
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('notes')
-        .doc(noteId)
-        .update(updateData);
-
-    // If the note is shared, also update in the shared user's collection
-    if (sharedUserId != null) {
+    if (sharedUserId != null && sharedUserId.isNotEmpty) {
+      // Update ONLY the shared copy in users/{sharedUserId}/shared/{noteId}
       await _firestore
           .collection('users')
           .doc(sharedUserId)
           .collection('shared')
           .doc(noteId)
-          .update(updateData); // Update in the shared collection for the shared user
+          .update(updateData);
+    } else {
+      // Update ONLY the owner’s note in users/{userId}/notes/{noteId}
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('notes')
+          .doc(noteId)
+          .update(updateData);
     }
   }
 
