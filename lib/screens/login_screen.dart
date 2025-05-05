@@ -206,11 +206,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24.0),
 
-
-
-
-
-                // --- Sign Up Link ---
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
